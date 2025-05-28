@@ -1,0 +1,98 @@
+Software Blueprint: Python-Centric Text Expander (Training-Free, Local, Modular, 2027 Edition)
+
+    Project Overview
+    An entirely offline, no-training text-expansion engine that:
+
+    Selects relevant content. Given a user’s draft and a folder of related documents, it automatically identifies only those source texts that match the user’s topic.
+
+    Segments and indexes. Breaks both the user’s draft and the selected source texts into individual sentences and embeds them for fast retrieval.
+
+    Interpolates. For each adjacent pair of original sentences, it retrieves the best candidate sentence from the indexed pool to fill any conceptual “gaps,” ensuring coherence.
+
+    Scores and filters. Assigns a relevance/coherence score to every candidate insertion and only keeps the highest-scoring sentences.
+
+    Assembles. Outputs a smoothly expanded version of the user’s writing, fully local and without any external model training or manual drafting.
+
+    Critical Architecture Updates
+    Component: Document Selector
+    Original Plan: N/A
+    Updated Role: TF-IDF + cosine filtering over document embeddings
+    Rationale: Automatically filters source texts to topic-relevant subset
+
+Component: ANN Index
+Original Plan: FAISS FlatL2
+Updated Role: Faceted FAISS indices (draft vs. source pools)
+Rationale: Separate indices for interpolation candidates
+
+Component: Sentence Segmenter
+Original Plan: Implicit in corpus loader
+Updated Role: Lightweight rule-based splitter + normalization
+Rationale: Ensures consistent sentence boundaries across all inputs
+
+Component: Interpolation Engine
+Original Plan: Light-DAG Merge
+Updated Role: Candidate retrieval between every original sentence pair
+Rationale: Retrieves and ranks best “bridge” sentences
+
+Component: Scoring & Filtering
+Original Plan: Simple similarity threshold
+Updated Role: Multi-metric scorer (semantic + positional coherence)
+Rationale: Balances topical relevance with flow and prevents jarring inserts
+
+Component: Fusion & Assembly
+Original Plan: Neural Constraint Templates
+Updated Role: Sequential merge with grammar correction steps
+Rationale: Integrates selected sentences without disrupting syntax
+
+Component: Grammar Correction
+Original Plan: LanguageTool subset
+Updated Role: Unchanged
+Rationale: Final pass to fix any residual agreement or punctuation issues
+
+    Updated High-Level Pipeline
+
+    Load user draft and source documents
+    draft_text = load_text("user_draft.txt")
+    docs = load_corpus("related_documents/")
+
+    Select only topically relevant docs
+    selected_docs = DocumentSelector.filter(docs, draft_text)
+
+    Segment into sentences
+    draft_sents = SentenceSegmenter.split(draft_text)
+    source_sents = SentenceSegmenter.split(selected_docs)
+
+    Embed and index sentences
+    draft_index = ANNIndex.build(draft_sents)
+    source_index = ANNIndex.build(source_sents)
+
+    Fill gaps between drafts
+    For each pair (a, b) in draft_sents:
+    Retrieve candidates = source_index.query_bridge(a, b)
+    Choose best = Scorer.rank(candidates, context=(a, b))[0]
+    Append a and best to expanded_sents
+
+    Merge and correct
+    raw_output = join expanded_sents with newline separators
+    final_output = GrammarCorrector.correct(raw_output)
+
+    Save result
+    save_text("expanded_draft.txt", final_output)
+
+    Component Responsibilities
+    DocumentSelector: Computes TF-IDF scores between the draft and each document, filters out documents below a relevance threshold.
+    SentenceSegmenter: Splits text at punctuation boundaries, normalizes whitespace, handles abbreviations and lists.
+    ANNIndex: Builds a FAISS FlatL2 index of source sentences for bridge-candidate retrieval; supports fast top-k queries.
+    Scorer: Combines semantic similarity, sentence position, and local coherence metrics; penalizes candidates that repeat or conflict with nearby content.
+    Interpolation Engine: Inserts the best-scoring sentence between each pair of draft sentences.
+    GrammarCorrector: Runs a rule-based pass (LanguageTool subset) to fix any residual agreement or punctuation issues.
+
+    Validation & Testing Strategy
+
+    Relevance tests: Ensure DocumentSelector excludes off-topic docs.
+
+    Gap-filling tests: Predefined sentence pairs with known “best” bridges.
+
+    Coherence scoring: A/B comparisons on held-out passages.
+
+    Resource constraints: Emulate low-end hardware (2 cores, 4 GB RAM) in CI.
