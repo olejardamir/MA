@@ -1,0 +1,136 @@
+**Software Blueprint: Text Expander with Interpolation and Extrapolation (Based Solely on the Original Master Thesis)**
+
+**1. Project Overview**
+This software is designed to semi-automatically expand natural language text using interpolation (inserting sentences between two user sentences) and extrapolation (predicting the next sentence based on previous ones). The methodology avoids semantic analysis, relying instead on string metrics, Bayesian classification, and vector-space analysis. This approach enables universal application across languages without language-specific processing.
+
+**2. Architecture and Workflow**
+
+**Step-by-Step Process:**
+
+1. **User Input**: User provides plain-text input.
+2. **Text Parsing**: Input is split into individual sentences.
+3. **Bayesian Classifier Training**: The classifier is trained on the user input.
+4. **Document Collection**: Relevant documents are gathered.
+5. **Sentence Extraction**: Documents are parsed and irrelevant ones removed.
+6. **Sentence Ranking**: Best-fit sentences are selected using:
+
+   * Modified summarization algorithms
+   * String metric comparisons
+   * Vector-space model training
+7. **Interpolation or Extrapolation**:
+
+   * **Interpolation**: Sentences are inserted between existing ones using string-metrics.
+   * **Extrapolation**: Future sentences are predicted using a short-term memory buffer and vector analysis.
+8. **Result Compilation**: Output text is generated and presented.
+
+**3. Algorithms and Formulas**
+
+**Interpolation Metrics:**
+
+* Levenshtein-Damerau distance
+* Longest Common Substring/Subsequence
+* Dice Coefficient
+* Smith-Waterman distance
+
+**Vector-Space Analysis:**
+
+* Used for extrapolation
+* Eureqa-generated formulas predict sentence flow using string patterns from the novel "War and Peace"
+
+**Formula Highlights:**
+
+* **Formula 2.4.1**: Predicts the distance U between the next sentence D and previous sentences A, B, and C using VSM metrics (e.g., vector-space distances between AB, BC, etc.).
+* **Formula 2.5.1.1**: LED = f(a, b, iab) — Levenshtein-Damerau distance modeled based on sentence lengths (a and b) and longest common subsequence (iab).
+* **Formula 2.5.3.2**: Adapted Dice coefficient using string lengths, alphabet overlaps, and longest common substrings.
+* **Formula 5.3**: Computes percent similarity between two sentences using LED, Smith-Waterman, and Chapman length metrics.
+
+**4. Functional Model**
+
+**Interpolation Mode:**
+
+* Bayesian classifier filters relevant documents.
+* String-metrics score sentence pairs.
+* Best sentence inserted between two existing ones.
+
+**Extrapolation Mode:**
+
+* Maintains short-term memory of last N=10 sentences (default).
+* Uses VSM to select next sentence based on similarity scoring.
+* Short-term memory is a LIFO queue.
+
+**5. Experimental Findings**
+
+**Text Quality Observations:**
+
+* Quality improves with larger, topic-specific input.
+* Interpolation achieves \~50% good sentence rate.
+* Extrapolation can reach \~80% relevance.
+
+**Example:**
+Input: "Novak Djokovic is the best tennis player of Serbia. He began to play tennis with only four years of age."
+Output: Additional sentences retrieved based on search and metrics (e.g., his opinions on clay courts).
+
+**6. Known Limitations**
+
+* High false-positive rate with small input
+* Classifier4J lacks support for negative training
+* Only `.txt` format supported (version 1.3)
+* No semantic awareness
+
+**7. Improvement Proposals (from Thesis):**
+
+1. Merge interpolation and extrapolation into one unified method.
+2. Introduce SVM or other classifiers.
+3. Extend document support (PDF, CHM, etc.).
+4. Optimize VSM with Eureqa-modelled approximations.
+5. Allow user to pick search engine and retain datasets.
+6. Build web-based Java applet interface.
+
+**8. Evaluation and Metrics**
+
+* Performance tested using "War and Peace" as corpus
+* Accuracy gauged via deviation graphs and regression coefficients (R2)
+* 15% average user adjustment needed for semantic fit
+
+**9. Data Sources**
+
+* Documents fetched via web queries (e.g., "Novak Djokovic biography")
+* Input/output examples included from various case studies (e.g., fairytales, sports articles)
+
+**10. Technical Clarifications from Thesis**
+
+**10.1 Formula & Implementation Details:**
+
+* Full expressions of the formulas are not included in the thesis text but are described in context:
+
+  * Formula 2.4.1: U = f(a2, b2, b3, c3) — predicts vector-space distance of next sentence.
+  * Formula 2.5.1.1: LED = f(a, b, iab)
+  * Formula 5.3: Computes difference between strings as a noisy signal using LED, LCS, and Chapman metrics.
+
+**10.2 Vector-Space Model Setup:**
+
+* Sentence vectors are derived using custom string-metric statistics, not TF-IDF or Word2Vec.
+* Eureqa-generated symbolic regression models predict sentence proximity without pretrained embeddings.
+
+**10.3 Bayesian Classifier Details:**
+
+* Features are basic word frequency and string similarity metrics.
+* Classifier is trained using positive samples from user input; no negative training set is used.
+
+**10.4 Corpus Gathering & Filtering:**
+
+* Documents are fetched using keyword-based web search (e.g., Yahoo search).
+* Filtering is based on classifier score and vector similarity with the input.
+
+**10.5 Operational & Interface Details:**
+
+* User Interface: Currently a desktop Java-based CLI application.
+* Input Format: Plain `.txt`, sentence-per-line preferred for parsing.
+* Output Format: Expanded text with optionally marked interpolated/extrapolated sentences.
+* Interpolation is pairwise: A and B get expanded with a sentence C to form ACB.
+* Extrapolation uses LIFO memory of 10 most recent sentences to predict the next one.
+
+**11. Conclusion**
+The system demonstrates effective semi-automated text expansion. While not yet capable of semantic reasoning, it lays foundational methods for language-independent expansion tools. It achieves partial automation with human-guided output selection and validation.
+
+**End of Blueprint (based solely on translated thesis)**
