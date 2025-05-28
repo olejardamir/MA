@@ -1,129 +1,227 @@
-Improved Iterative Text Expander Blueprint (2027 Edition)
-Project Overview
-An offline, training-free system that progressively expands text through iterative gap analysis. Starting with the first two sentences, it intelligently inserts relevant content from a document corpus between sentence pairs, repeating the process with newly formed adjacent sentences until optimal coherence is achieved.
+Iterative Text Expander Component Blueprint (Developer Specification)
+1. System Overview
+A Python-based text expansion module that iteratively inserts relevant content between sentences using local documents. The system progresses through sentence pairs until no suitable insertions remain.
 
-Key Improvements from Previous Design
+2. Component Architecture
 
-Iterative Gap Processing
+Diagram
+Code
 
-Progressive insertion between new sentence pairs formed after each insertion
 
-Depth-limited expansion (max 3 iterations) to prevent over-insertion
 
-Context carryover between iterations
 
-Dynamic Termination
 
-Confidence-based stopping (no insertion if max score < threshold)
 
-Novelty-based termination (stop when new inserts add <5% information)
 
-Positional decay (diminishing returns for later insertions)
 
-Context Accumulation
 
-Rolling context window expands with each insertion
 
-Weighted neighbor influence (previous inserts impact next decisions)
 
-Efficiency Optimizations
 
-Incremental indexing of inserted sentences
 
-Candidate reuse across iterations
 
-Batch gap analysis
 
-Final Blueprint Specification
-Core Architecture
 
-Iteration Controller
 
-Manages expansion depth and termination logic
 
-Tracks insertion history and confidence decay
 
-Enforces maximum expansion ratio (40% length increase)
+3. Core Components Specification
 
-Expansion Pipeline
+3.1 Document Selector
+
+Input: Draft text + directory of .txt files
+
+Process:
+
+Compute TF-IDF between draft and each document
+
+Fallback to BERT similarity if TF-IDF < 0.3
+
+Return top 15 relevant documents (max 10x draft length)
+
+Output: Filtered document list
+
+3.2 Sentence Segmenter
+
+Requirements:
+
+Preserve technical terms (e.g., "Fig. 1A" not split)
+
+Maintain list formatting (bullets/numbers)
+
+Handle multilingual punctuation
+
+Libraries: spaCy sentencizer (disable parser/tagger)
+
+3.3 ANN Index
+
+Structure:
 
 python
-current_text = initial_draft
-inserted_count = 0
-MAX_ITERATIONS = 3
+{
+    "sentence": str,
+    "embedding": float32[384],
+    "source_doc": str,
+    "position": int
+}
+Technology: FAISS IVF-PQ index (nlist=100)
 
-for i in range(MAX_ITERATIONS):
-    sentences = Segmenter.split(current_text)
-    if len(sentences) < 2: break
+Operations: add(), search(queries, k=10)
+
+3.4 Bridge Retriever
+
+Query Logic:
+query_embed = model.encode(f"{prev_sent} [BRIDGE] {next_sent}")
+
+Features:
+
+Transition word boost (+0.2 score for "however/furthermore")
+
+Context window (previous 2 sentences considered)
+
+3.5 Scoring Engine
+Scoring Formula:
+total_score = (0.5 * semantic_sim) + (0.3 * novelty) + (0.2 * flow)
+
+Metrics:
+
+semantic_sim: Cosine similarity to gap context
+
+novelty: 1 - (max n-gram overlap with existing text)
+
+flow: Transition word match + position proximity
+
+Thresholds:
+
+Min insertion score: 0.65
+
+Novelty requirement: <40% 4-gram overlap
+
+3.6 Iteration Controller
+
+python
+def expand_iteratively(draft: str, corpus_dir: str) -> str:
+    sentences = segment(draft)
+    relevant_docs = select_docs(draft, corpus_dir)
+    index = build_index(relevant_docs)
+    expanded = [sentences[0]]
     
-    new_inserts = 0
-    expanded_text = sentences[0]  # Start with first sentence
-    
-    # Process all adjacent pairs
-    for j in range(len(sentences)-1):
-        # Retrieve bridge candidates between j and j+1
-        candidates = Index.query_bridge(sentences[j], sentences[j+1], 
-                                       context=expanded_text[-1000:])
+    for i in range(1, len(sentences)):
+        candidates = retrieve_bridges(
+            prev=expanded[-1], 
+            next=sentences[i],
+            context=" ".join(expanded[-2:])
+        )
         
-        # Select best candidate meeting threshold
-        best_candidate, score = Scorer.rank(candidates)
+        if candidates:
+            best = score_candidates(candidates)
+            if best['score'] > 0.65:
+                expanded.append(best['text'])
         
-        if score > CONFIDENCE_THRESHOLD and is_novel(best_candidate):
-            expanded_text += best_candidate
-            new_inserts += 1
-            
-        expanded_text += sentences[j+1]  # Always add next sentence
+        expanded.append(sentences[i])
     
-    if new_inserts == 0: break  # Termination condition
-    current_text = expanded_text
-    inserted_count += new_inserts
-Component Enhancements
+    return correct_grammar(" ".join(expanded))
+3.7 Termination Conditions
 
-Document Selector: Pre-filters corpus to 10X draft length (resource optimization)
+Condition	Action
+No candidates found	Proceed to next pair
+Best score < 0.65	Skip insertion
+Novelty score < 0.4	Reject candidate
+40% length increase reached	Halt further expansion
+3 passes completed	Return current result
+4. Interface Contracts
 
-ANN Index: Maintains dynamic index of both source corpus and high-scoring inserts
+python
+class TextExpander:
+    def __init__(self, corpus_path: str, config: dict = DEFAULT_CONFIG):
+        """Initialize with document corpus"""
+        
+    def expand(
+        self, 
+        text: str, 
+        max_iterations: int = 3,
+        expansion_limit: float = 0.4
+    ) -> dict:
+        """
+        Returns:
+        {
+            "expanded_text": str,
+            "insertions": [
+                {"position": int, "sentence": str, "source": str},
+                ...
+            ],
+            "metrics": {
+                "original_length": int,
+                "final_length": int,
+                "iteration_count": int
+            }
+        }
+        """
+5. Performance Requirements
 
-Scoring Engine:
+Input Limits:
 
-Progressive confidence decay (later inserts require 15% higher scores)
+Max draft length: 5,000 words
 
-Insertion history awareness (prevents redundant content)
+Max corpus size: 10,000 documents
 
-Context weighting (recent sentences have 2X influence)
+Resource Constraints:
 
-Grammar Corrector: Runs minimally after final iteration (performance focus)
+Memory: <1GB for 10K-document corpus
 
-Termination Logic
+Processing: <15s for 500-word draft on i5 CPU
 
-Hard limits: Max 3 iterations OR 40% length increase
+Output Quality:
 
-Quality thresholds:
+Coherence: >0.90 BERTScore F1
 
-Candidate score < 0.65 confidence
+Novelty: <30% n-gram overlap with source
 
-Novelty score < 0.2 (measured by n-gram divergence)
+6. Validation Test Cases
 
-Contextual saturation: Last insertion improved coherence < 5%
+Test 1: Basic Insertion
 
-Validation Metrics
+Input Draft: "Photosynthesis requires light. Plants convert CO2 to oxygen."
 
-Iteration Efficiency: Avg. 2.1 insertions per draft
+Expected Insert: "Chlorophyll captures light energy for this process."
 
-Progressive Coherence: BERTScore should increase 8-12% per iteration
+Test 2: Termination Logic
 
-Termination Accuracy: 95% proper stop at optimal expansion point
+python
+# Should terminate after 2 insertions
+expander = TextExpander(corpus_path, {"max_iterations": 3})
+result = expander.expand(text, expansion_limit=0.3)
+assert result["metrics"]["iteration_count"] == 2
+Test 3: Technical Term Handling
 
-Resource Profile: Linear memory growth < 120MB per 1K iterations
+Input: "The CRISPR-Cas9 system enables gene editing. It uses guide RNA."
 
-Example Workflow
+Verification: Ensure "CRISPR-Cas9" remains intact during segmentation
 
-Input Draft: "Mitochondria produce energy. Oxidative stress causes damage."
+Test 4: Resource Boundary
 
-Iteration 1 Insert: "This occurs through the electron transport chain."
-→ New pairs: [1-Insert] and [Insert-2]
+python
+# 10K docs should stay under 1GB RAM
+with measure_memory():
+    expander = TextExpander(large_corpus)
+    assert peak_memory < 1024  # MB
+7. Development Milestones
 
-Iteration 2 Insert: "Free radicals overwhelm antioxidant defenses" between Insert-2
+Week 1: Implement DocumentSelector + SentenceSegmenter
 
-Termination: No viable bridge between new pairs
+Week 2: Build ANN Index + BridgeRetriever
 
-Output: "Mitochondria produce energy. This occurs through the electron transport chain. Free radicals overwhelm antioxidant defenses. Oxidative stress causes damage."
+Week 3: Develop Scoring Engine + Iteration Controller
+
+Week 4: Integrate Grammar Correction + Validation Suite
+
+Week 5: Performance Optimization + Edge Case Handling
+
+8. Dependencies
+
+Library	Purpose	Version
+sentence-transformers	Embedding generation	>=2.2.0
+faiss-cpu	Efficient similarity search	>=1.7.3
+spacy	Sentence segmentation	>=3.5.0
+language-tool-python	Grammar correction	>=2.7.0
+This blueprint provides complete implementation specifications while maintaining flexibility for developer innovation in scoring algorithms and optimization strategies. The iterative approach ensures natural expansion while preventing over-insertion through scientifically validated termination heuristics.
