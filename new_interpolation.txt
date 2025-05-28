@@ -1,0 +1,86 @@
+
+INTERPOLATION STEP – HIGH-LEVEL PSEUDOCODE (TEXT-ONLY FORMAT)
+TECHNOLOGIES & STRATEGY (All Run Locally)
+
+    Embedding Model: Use quantized GTE-small or E5-small (INT8, ONNX)
+
+    Indexing: FAISS with HNSW (low-memory config)
+
+    Tagging/NLP: spaCy (en_core_web_sm) for POS/entity analysis
+
+    Grammar Check: CoLA or LMGrammar (quantized via LoRA, ONNX)
+
+    Discourse Marker Ref: CueBank (JSON map of connectives)
+
+    Fluency & Coherence: n-gram scoring + embedding window
+
+PHASE 1: PREPROCESSING
+
+1. LOAD TEXT FILES
+    - Iterate over .txt files in directory
+    - Read and collect all raw text → RAW_SENTENCES
+
+2. CLEAN TEXT
+    - Normalize Unicode
+    - Lowercase, strip whitespace, remove noise
+    - Output → CLEAN_SENTENCES
+
+3. SPLIT INTO SENTENCES
+    - Segment clean text into sentences
+    - Output → SENTENCE_LIST
+
+4. ENCODE SENTENCES
+    - Load quantized sentence encoder (ONNX)
+    - Encode all SENTENCE_LIST → EMBEDDING_DB
+
+5. BUILD FAISS INDEX
+    - Initialize FAISS with HNSW (optimized for low memory)
+    - Insert all EMBEDDING_DB vectors into index
+
+PHASE 2: INTERPOLATION LOOP
+
+FOR each consecutive sentence pair (A, B) in SENTENCE_LIST:
+
+    1. RETRIEVE EMBEDDINGS
+        - A_VEC = embedding of A
+        - B_VEC = embedding of B
+        - INTERP_VEC = (A_VEC + B_VEC) / 2
+
+    2. QUERY FAISS
+        - Find top-k (e.g., 8) nearest neighbors of INTERP_VEC
+        - Output → CANDIDATES
+
+    3. SCORE CANDIDATES
+        FOR each candidate sentence C in CANDIDATES:
+
+            a. Semantic Similarity
+                - CosineSim(A, C) + CosineSim(C, B) / 2
+
+            b. Entity Overlap
+                - Named entity alignment across A, C, B via spaCy
+
+            c. CueBank Match
+                - Does C contain valid discourse connective between A & B?
+
+            d. POS Continuity
+                - Compare POS tag transitions across A-C-B
+
+            e. Grammar Score
+                - Run offline grammar model (CoLA or LMGrammar)
+                - Invert error count for scoring
+
+            f. Fluency (N-gram)
+                - Check for n-gram continuity across A-C-B
+
+            g. Local Coherence
+                - Use SlidingWindowEmbedding to assess smoothness
+
+            h. Aggregate Score
+                - Weighted sum: semantic + grammar + cue + pos + coherence
+
+    4. SELECT & INSERT
+        - Choose C* with highest aggregate score
+        - Insert C* between A and B into NEW_SEQUENCE
+
+RETURN NEW_SEQUENCE
+
